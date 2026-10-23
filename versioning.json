@@ -1,0 +1,40 @@
+{
+  "buildTime": "2026-10-23T17:37:00.202Z",
+  "builtWith": {
+    "toolchain": "1.0.0-alpha.92",
+    "types": "1.0.0-alpha.92"
+  },
+  "repository": {
+    "name": "Google Drive Manga",
+    "description": "Read CBZ manga straight from a Google Drive folder in Paperback 0.9."
+  },
+  "sources": [
+    {
+      "name": "Google Drive",
+      "description": "Read your own CBZ/ZIP manga library from a Google Drive folder. One sub-folder per series, one archive per chapter or volume.",
+      "version": "1.1.0",
+      "icon": "icon.png",
+      "language": "multi",
+      "contentRating": "SAFE",
+      "capabilities": [
+        1,
+        64,
+        4,
+        32
+      ],
+      "badges": [
+        {
+          "label": "Self-hosted",
+          "textColor": "#FFFFFF",
+          "backgroundColor": "#1A73E8"
+        }
+      ],
+      "developers": [
+        {
+          "name": "remo"
+        }
+      ],
+      "id": "GoogleDrive"
+    }
+  ]
+}
