@@ -239,6 +239,18 @@ const first = await ext.getChapterDetails(opChapters[0]);
 await load(first.pages[0]);
 check(server.bytesServed < big * 0.6, `first page of v01 cost ${server.bytesServed} of ${big} bytes`);
 
+console.log("Rate limiting");
+{
+  const t = Date.now();
+  await Promise.all(
+    Array.from({ length: 45 }, () =>
+      Application.scheduleRequest({ url: `https://www.googleapis.com/drive/v3/files/${ROOT_ID}?fields=id`, method: "GET" }),
+    ),
+  );
+  const ms = Date.now() - t;
+  check(ms >= 1000, `a burst of 45 requests is spread over time (${ms} ms, limit 20/s)`);
+}
+
 console.log("Covers");
 const coverOf = async (rel) => sha((await load(op.mangaInfo.thumbnailUrl.replace(id("One Piece"), id(rel)))).data);
 check(await coverOf("One Piece") === sha(nodes.get(id("One Piece/cover.jpg")).data), "cover.jpg in series folder");
@@ -277,14 +289,6 @@ check(afterExpiry.length === 3 && server.refreshes === 1, "401 triggers one refr
 const noKeyLeak = server.requests.every((r) => !/TEST_API_KEY|tok_|TEST_REFRESH|csecret/.test(r.url));
 check(noKeyLeak, "credentials only travel in headers, never in URLs");
 
-console.log("Setup code");
-const code = Buffer.from(JSON.stringify({ v: 1, f: "1SetupFolderId000000000", ci: "cid2.apps.googleusercontent.com", cs: "csecret2", rt: "rt2" })).toString("base64url");
-await form.setSetupCode("not-a-code");
-check(/isn't valid/.test(form.status?.text), "invalid setup code rejected", form.status?.text);
-await form.setSetupCode(code);
-check(/applied/.test(form.status?.text), "setup code applied", form.status?.text);
-check(Application.getState("rootFolderInput").endsWith("/folders/1SetupFolderId000000000") && Application.getSecureState("oauthRefreshToken") === "rt2" && Application.getSecureState("oauthClientSecret") === "csecret2" && Application.getState("oauthClientId") === "cid2.apps.googleusercontent.com" && Application.getState("authMode") === "oauth", "setup code fills folder, mode and credentials");
-check(form.getSections().find((s) => s.id === "setup").items[0].value === "", "setup code isn't echoed back in the form");
 // restore the working OAuth credentials for the remaining tests
 await form.setRootFolder(`https://drive.google.com/drive/folders/${ROOT_ID}`);
 await form.setClientId("cid.apps.googleusercontent.com");

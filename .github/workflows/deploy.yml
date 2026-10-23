@@ -1,17 +1,17 @@
-name: Bundle and deploy to GitHub Pages
+name: Release to GitHub Pages
 
-# Builds the extension and publishes ./bundles to the gh-pages branch,
-# which GitHub Pages serves at https://<user>.github.io/<repo>/.
+# Publishes the extension only when a release tag (v1.2.3) is pushed, or when run
+# by hand from the Actions tab. Pushing to main does NOT reach users; that keeps
+# work-in-progress off everyone's phones. To release: bump `version` in
+# src/GoogleDrive/pbconfig.ts, commit, then push a tag with the same version.
 #
-# Third-party actions are pinned to a specific commit SHA (not a floating tag
-# like @v4) so a compromised or moved tag can't run new code in this repo, which
-# has contents:write. The trailing comment records the human-readable version.
+# Third-party actions are pinned to a commit SHA (not a movable tag like @v4), so
+# a compromised tag can't run new code in a job that can write to this repo.
 on:
   push:
-    branches: [main]
+    tags: ["v*"]
   workflow_dispatch:
 
-# Least privilege: only the deploy step needs write, and nothing needs anything else.
 permissions:
   contents: write
 
@@ -20,7 +20,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  bundle-deploy:
+  release:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@eef61447b9ff4aafe5dcd4e0bbf5d482be7e7871 # v4.2.1
@@ -31,8 +31,16 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --ignore-scripts
+      - name: Check the tag matches the extension version
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          version=$(node -e "const s=require('fs').readFileSync('src/GoogleDrive/pbconfig.ts','utf8');console.log(s.match(/version:\s*\"([^\"]+)\"/)[1])")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME doesn't match pbconfig version $version"
+            exit 1
+          fi
       - run: npx tsc -p .
-      - run: npm run bundle
+      - run: npm test
       - run: touch bundles/.nojekyll
       - uses: peaceiris/actions-gh-pages@4f9cc6602d3f66b9c108549d475ec49e8ef4d45e # v4.0.0
         with:

@@ -1,4 +1,5 @@
 import {
+  BasicRateLimiter,
   ContentRating,
   DiscoverSectionType,
   type Chapter,
@@ -63,7 +64,17 @@ export class GoogleDriveExtension implements ExtensionImpl<typeof pbconfig> {
   readonly drive = new DriveClient(this.auth);
   readonly library = new Library(this.drive);
 
+  // Keeps bursts (library updates, chapter prefetch) well under Google Drive's
+  // per-user API quota, so large libraries don't trip "rate limit exceeded" errors.
+  readonly rateLimiter = new BasicRateLimiter("googleDriveRateLimiter", {
+    numberOfRequests: 20,
+    bufferInterval: 1,
+    ignoreImages: false,
+  });
+
   async initialise(): Promise<void> {
+    // Register the rate limiter first so it runs before credentials are attached.
+    this.rateLimiter.registerInterceptor();
     Application.registerInterceptor(
       "googleDriveInterceptor",
       Application.Selector(this as GoogleDriveExtension, "interceptRequest"),

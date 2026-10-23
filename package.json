@@ -1,11 +1,11 @@
 {
   "name": "Google Drive Manga",
   "private": true,
-  "description": "Read CBZ manga straight from a Google Drive folder in Paperback 0.9.",
+  "description": "Unofficial Paperback 0.9 extension: read CBZ manga straight from your own Google Drive folder.",
   "type": "module",
   "scripts": {
     "tsc": "tsc -p .",
-    "bundle": "paperback-cli bundle && node -e \"require('fs').cpSync('site','bundles',{recursive:true})\"",
+    "bundle": "paperback-cli bundle",
     "serve": "paperback-cli serve",
     "dev": "paperback-cli serve --watch",
     "logcat": "paperback-cli logcat",

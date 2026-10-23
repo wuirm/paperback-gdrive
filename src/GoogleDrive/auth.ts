@@ -81,7 +81,7 @@ export class AuthManager {
       const reason = json.error_description ?? json.error ?? `HTTP ${response.status}`;
       const hint =
         json.error === "invalid_grant"
-          ? " The refresh token was revoked or expired. If your OAuth consent screen is in 'Testing', tokens expire after 7 days; publish the app and generate a new token."
+          ? " The refresh token was revoked or expired. Tokens expire after 7 days while the app is in 'Testing' (publish it), or after 24 hours if the OAuth Playground wasn't using your own credentials. Generate a new token."
           : "";
       throw new AuthError(`Google sign-in failed: ${reason}.${hint}`);
     }
