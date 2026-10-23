@@ -1,0 +1,26 @@
+{
+  "name": "Google Drive Manga",
+  "private": true,
+  "description": "Read CBZ manga straight from a Google Drive folder in Paperback 0.9.",
+  "type": "module",
+  "scripts": {
+    "tsc": "tsc -p .",
+    "bundle": "paperback-cli bundle",
+    "serve": "paperback-cli serve",
+    "dev": "paperback-cli serve --watch",
+    "logcat": "paperback-cli logcat",
+    "test": "python3 test/make_fixtures.py && npm run bundle && node test/e2e.mjs"
+  },
+  "dependencies": {
+    "fflate": "^0.8.2"
+  },
+  "devDependencies": {
+    "@paperback/runtime-polyfills": "^1.0.0-alpha.92",
+    "@paperback/toolchain": "1.0.0-alpha.92",
+    "@paperback/types": "1.0.0-alpha.92",
+    "typescript": "^5.9.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
