@@ -72,7 +72,7 @@ npm test         # full test suite
 Pushes to `main` run the tests but don't reach users. To publish a release:
 
 1. Bump `version` in `src/GoogleDrive/pbconfig.ts` and commit.
-2. Push a matching tag, for example `git tag v1.2.0 && git push origin v1.2.0`.
+2. On GitHub, open **Releases → Draft a new release**, type a new tag matching the version (for example `v1.2.0`), and tap **Publish release**. Pushing the tag from the command line works too.
 
 The **Release to GitHub Pages** workflow checks the tag matches the version, runs the tests, and publishes. Paperback then offers the update to everyone.
 
