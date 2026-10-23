@@ -175,6 +175,28 @@ async function main() {
     ok(handled, "corrupt deflate throws a catchable error");
   }
 
+  console.log("Equal-size stored pages (one starts at twice another's offset) return the right page");
+  {
+    const pages = [0, 1, 2, 3].map((i) => new Uint8Array(1000).fill(65 + i));
+    const zip = buildZip(
+      pages.map((d, i) => ({ name: `${i}.jpg`, data: d, method: 0, compressedSize: d.length, uncompressedSize: d.length })),
+    );
+    const index = await readZipIndex(zip.length, readerFor(zip));
+    const specs = entrySpecs(index);
+    let ranged = true;
+    let whole = true;
+    for (const e of index.entries) {
+      const spec = specs.get(e)!;
+      const want = 65 + Number(e.name[0]);
+      // Range response (206): data starts at the entry.
+      if (extractEntry(zip.subarray(spec.start, spec.end + 1), spec)[0] !== want) ranged = false;
+      // Whole-file response (200): entry sits at its absolute offset.
+      if (extractEntry(zip, spec, spec.start)[0] !== want) whole = false;
+    }
+    ok(ranged, "every page correct from range responses");
+    ok(whole, "every page correct from whole-file responses");
+  }
+
   console.log("Not-a-zip input is rejected cleanly");
   {
     let threw = false;

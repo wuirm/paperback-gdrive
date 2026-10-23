@@ -227,10 +227,13 @@ export function entrySpecs(index: ZipIndex): Map<ZipEntry, EntrySpec> {
 }
 
 /**
- * Given the bytes returned for a Range request (or the full file, if the
- * server ignored the Range header), return the decompressed entry.
+ * Return the decompressed entry from `data`, whose local header starts at
+ * `base`. For a Range response (HTTP 206) the data begins at the entry, so
+ * `base` is 0. If the server ignored Range and sent the whole file (HTTP 200),
+ * pass `spec.start`. The caller decides from the response status; guessing from
+ * the bytes can latch onto a different entry's header.
  */
-export function extractEntry(data: Uint8Array, spec: EntrySpec): Uint8Array {
+export function extractEntry(data: Uint8Array, spec: EntrySpec, base = 0): Uint8Array {
   if (
     !Number.isSafeInteger(spec.compressedSize) ||
     !Number.isSafeInteger(spec.uncompressedSize) ||
@@ -242,13 +245,7 @@ export function extractEntry(data: Uint8Array, spec: EntrySpec): Uint8Array {
     throw new Error("ZIP entry is implausibly large; refusing to read it");
   }
 
-  // The response is either exactly the entry's byte range (data starts at its local
-  // header) or, if the server ignored Range, the whole file (the header sits at the
-  // entry's absolute offset). Detect the whole-file case by a valid signature at the
-  // absolute offset; otherwise treat the data as starting at the entry.
-  const base =
-    spec.start > 0 && data.length >= spec.start + 30 && u32(data, spec.start) === SIG_LOCAL ? spec.start : 0;
-  if (data.length < base + 30 || u32(data, base) !== SIG_LOCAL) {
+  if (!Number.isSafeInteger(base) || base < 0 || data.length < base + 30 || u32(data, base) !== SIG_LOCAL) {
     throw new Error("Response does not contain the expected ZIP entry");
   }
   const flags = u16(data, base + 6);

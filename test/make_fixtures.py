@@ -87,8 +87,11 @@ def main():
     make_cbz("One Piece/One Piece v01.cbz",
              natural_pages(["001.jpg", "002.jpg", "003.jpg", "010.jpg", "011.jpg"]),
              comicinfo=comicinfo)
+    # Stored, equal-size pages with equal-length names: entries land at 0, S, 2S…
+    # so one page starts at exactly twice another's offset (regression layout).
     make_cbz("One Piece/One Piece v02.cbz",
-             natural_pages(["p1.jpg", "p2.jpg", "p10.jpg"]), compression=zipfile.ZIP_STORED, junk=False)
+             [(n, fake_image("jpg", size=996)) for n in ["p1.jpg", "p2.jpg", "p3.jpg"]],
+             compression=zipfile.ZIP_STORED, junk=False)
     write("One Piece/notes.txt", b"ignore me")
 
     # 2. Nested volume folders, no cover -> cover from first archive's first page

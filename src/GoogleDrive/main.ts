@@ -265,7 +265,11 @@ export class GoogleDriveExtension implements ExtensionImpl<typeof pbconfig> {
     if (!spec) return data;
 
     try {
-      return toArrayBuffer(extractEntry(new Uint8Array(data), spec));
+      // 206: Drive honoured the Range header, so the data starts at the entry.
+      // 200: it sent the whole file, so the entry sits at its absolute offset.
+      const bytes = new Uint8Array(data);
+      const base = response.status === 200 && bytes.length >= spec.start + 30 ? spec.start : 0;
+      return toArrayBuffer(extractEntry(bytes, spec, base));
     } catch (e) {
       console.log(`[GoogleDrive] could not extract page: ${String(e)}`);
       return data;
