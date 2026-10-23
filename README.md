@@ -67,8 +67,8 @@ The folder stays private. You give the extension a long-lived *refresh token* fo
 Paperback installs extensions from a *repository*, which is just a folder of static files on the web. The easiest free host is GitHub Pages, and the included workflow does the building for you, so you don't need Node installed.
 
 1. Create a new GitHub repository (public, or private if your plan allows private Pages) and push this folder to its `main` branch.
-2. In the repository: **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-3. Go to the **Actions** tab and wait for *Bundle and deploy to GitHub Pages* to finish (re-run it if the first push happened before step 2).
+2. The *Bundle and deploy to GitHub Pages* workflow builds the extension and publishes it to the `gh-pages` branch on every push to `main`.
+3. If the site doesn't appear after the first run, open **Settings → Pages → Build and deployment**, choose **Deploy from a branch**, and pick `gh-pages` / `(root)`.
 4. Your repository URL is `https://<your-username>.github.io/<repo-name>/`.
 
 The repository only contains code; your API key, tokens and folder link are entered in the app and stored on your phone.
