@@ -96,3 +96,29 @@ export const Settings = {
     setString(K.langCode, v);
   },
 };
+
+/**
+ * A "setup code" bundles the folder and OAuth credentials into one string so they can be
+ * pasted into Paperback in one go: base64url(JSON {v:1, f: folderId, ci, cs, rt}).
+ * Returns false if the text isn't a valid setup code.
+ */
+export function applySetupCode(text: string): boolean {
+  const raw = text.trim().replace(/^pbgd1[:.]/i, "");
+  if (raw.length < 40 || !/^[A-Za-z0-9_-]+={0,2}$/.test(raw)) return false;
+  let b64 = raw.replace(/-/g, "+").replace(/_/g, "/");
+  while (b64.length % 4) b64 += "=";
+  let json: { v?: number; f?: string; ci?: string; cs?: string; rt?: string };
+  try {
+    const decoded = Application.base64Decode(b64);
+    json = JSON.parse(typeof decoded === "string" ? decoded : Application.arrayBufferToUTF8String(decoded));
+  } catch {
+    return false;
+  }
+  if (json.v !== 1 || !json.ci || !json.cs || !json.rt) return false;
+  if (json.f) Settings.rootFolderInput = `https://drive.google.com/drive/folders/${json.f}`;
+  Settings.authMode = "oauth";
+  Settings.clientId = json.ci;
+  Settings.clientSecret = json.cs;
+  Settings.refreshToken = json.rt;
+  return true;
+}

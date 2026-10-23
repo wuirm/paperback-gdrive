@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "tsc": "tsc -p .",
-    "bundle": "paperback-cli bundle",
+    "bundle": "paperback-cli bundle && node -e \"require('fs').cpSync('site','bundles',{recursive:true})\"",
     "serve": "paperback-cli serve",
     "dev": "paperback-cli serve --watch",
     "logcat": "paperback-cli logcat",

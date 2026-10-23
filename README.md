@@ -60,6 +60,8 @@ The folder stays private. You give the extension a long-lived *refresh token* fo
 
 `drive.readonly` means the extension can read your Drive but never modify it.
 
+**Setup code (optional shortcut).** Instead of typing the folder link, client ID, secret and refresh token into Paperback one by one, you can paste a single *setup code* into **Quick setup**. It's `base64url` of `{"v":1,"f":"<folder id>","ci":"<client id>","cs":"<client secret>","rt":"<refresh token>"}`. Treat it like a password. `site/oauth.html` (published next to the extension) is a landing page that displays the authorization code if you register `https://<user>.github.io/<repo>/oauth.html` as your client's redirect URI and exchange the code yourself.
+
 ---
 
 ## 2. Host the extension

@@ -1,6 +1,6 @@
 import { ButtonRow, Form, InputRow, LabelRow, Section, SelectRow, ToggleRow, type FormSectionElement } from "@paperback/types";
 import type { Library } from "./library";
-import { parseFolderId, Settings, type AuthMode } from "./state";
+import { applySetupCode, parseFolderId, Settings, type AuthMode } from "./state";
 
 export class GoogleDriveSettingsForm extends Form {
   private status: { text: string; style?: "success" | "error" | "warning" } | undefined;
@@ -16,6 +16,21 @@ export class GoogleDriveSettingsForm extends Form {
     const folderOk = !folderInput || !!parseFolderId(folderInput);
 
     return [
+      Section(
+        {
+          id: "setup",
+          header: "Quick setup",
+          footer: "Have a setup code? Paste it here to fill in the folder and sign-in details below in one go.",
+        },
+        [
+          InputRow("setupCode", {
+            title: "Setup code",
+            value: "",
+            isSecureEntry: true,
+            onValueChange: Application.Selector(this as GoogleDriveSettingsForm, "setSetupCode"),
+          }),
+        ],
+      ),
       Section(
         {
           id: "library",
@@ -146,6 +161,17 @@ export class GoogleDriveSettingsForm extends Form {
     this.library.clearCaches();
     this.library.drive.auth.invalidate();
     this.status = undefined;
+  }
+
+  async setSetupCode(value: string): Promise<void> {
+    if (!value.trim()) return;
+    if (applySetupCode(value)) {
+      this.changed();
+      this.status = { text: "Setup code applied. Tap Test connection.", style: "success" };
+    } else {
+      this.status = { text: "That setup code isn't valid. Copy the whole code and try again.", style: "error" };
+    }
+    this.reloadForm();
   }
 
   async setRootFolder(value: string): Promise<void> {
