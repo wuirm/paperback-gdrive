@@ -160,8 +160,17 @@ export class DriveClient {
     return bytes;
   }
 
-  async download(fileId: string): Promise<ArrayBuffer> {
-    const [, data] = await this.send({ url: mediaUrl(fileId), method: "GET" });
-    return data;
+  /**
+   * Reads at most `maxBytes` of a file as UTF-8. Used for small sidecar metadata
+   * (details.json, ComicInfo.xml) so a mislabelled or oversized file can't make
+   * the extension download and decode an unbounded blob.
+   */
+  async downloadText(fileId: string, maxBytes = 2 * 1024 * 1024): Promise<string> {
+    const bytes = await this.readRange(fileId, 0, maxBytes - 1);
+    return Application.arrayBufferToUTF8String(toArrayBufferView(bytes.subarray(0, maxBytes)));
   }
+}
+
+function toArrayBufferView(u8: Uint8Array): ArrayBuffer {
+  return u8.slice().buffer as ArrayBuffer;
 }

@@ -304,7 +304,7 @@ export class Library {
     const details = children.find((f) => /^details\.json$/i.test(f.name));
     if (details) {
       try {
-        meta = parseDetailsJson(Application.arrayBufferToUTF8String(await this.drive.download(details.id)));
+        meta = parseDetailsJson(await this.drive.downloadText(details.id));
       } catch (e) {
         console.log(`[GoogleDrive] could not read details.json: ${String(e)}`);
       }
@@ -314,7 +314,7 @@ export class Library {
     const looseComicInfo = children.find((f) => /^comicinfo\.xml$/i.test(f.name));
     try {
       if (looseComicInfo) {
-        comicInfoXml = Application.arrayBufferToUTF8String(await this.drive.download(looseComicInfo.id));
+        comicInfoXml = await this.drive.downloadText(looseComicInfo.id);
       } else {
         const firstArchive = (await this.getChapterRefs(folderId)).find((r) => r.format === "cbz");
         if (firstArchive) {

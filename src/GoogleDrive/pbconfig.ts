@@ -4,7 +4,7 @@ export default {
   name: "Google Drive",
   description:
     "Read your own CBZ/ZIP manga library from a Google Drive folder. One sub-folder per series, one archive per chapter or volume.",
-  version: "1.0.2",
+  version: "1.1.0",
   icon: "icon.png",
   language: "multi",
   contentRating: ContentRating.EVERYONE,

@@ -20,6 +20,14 @@ const SIG_LOCAL = 0x04034b50;
 
 export const DEFAULT_TAIL_SIZE = 128 * 1024;
 
+/**
+ * Upper bound on a single entry's compressed and uncompressed size. A real manga
+ * page is well under this; a larger value is a corrupt or hostile archive trying
+ * to make us allocate a giant buffer or pull a giant byte range. Entries over the
+ * cap are refused rather than processed.
+ */
+export const MAX_ENTRY_BYTES = 256 * 1024 * 1024;
+
 export interface ZipEntry {
   name: string;
   method: number;
@@ -113,8 +121,11 @@ export async function readZipIndex(
     const loc = eocd - 20;
     if (loc >= 0 && u32(tail, loc) === SIG_ZIP64_LOCATOR) {
       const z64Offset = u64(tail, loc + 8);
+      if (!Number.isSafeInteger(z64Offset) || z64Offset < 0 || z64Offset + 56 > size) {
+        throw new Error("Corrupt ZIP64 locator: record offset lies outside the file");
+      }
       const rec =
-        z64Offset >= tailStart && z64Offset + 56 <= size
+        z64Offset >= tailStart
           ? tail.subarray(z64Offset - tailStart)
           : await read(z64Offset, z64Offset + 55);
       if (u32(rec, 0) !== SIG_ZIP64_EOCD) throw new Error("Corrupt ZIP64 end-of-central-directory record");
@@ -124,7 +135,15 @@ export async function readZipIndex(
     }
   }
 
-  if (cdOffset + cdSize > size) throw new Error("Corrupt ZIP: central directory lies outside the file");
+  if (
+    !Number.isSafeInteger(cdOffset) ||
+    !Number.isSafeInteger(cdSize) ||
+    cdOffset < 0 ||
+    cdSize < 0 ||
+    cdOffset + cdSize > size
+  ) {
+    throw new Error("Corrupt ZIP: central directory lies outside the file");
+  }
 
   const cd =
     cdOffset >= tailStart
@@ -184,23 +203,25 @@ export async function readZipIndex(
 export function entrySpecs(index: ZipIndex): Map<ZipEntry, EntrySpec> {
   const byOffset = [...index.entries].sort((a, b) => a.localHeaderOffset - b.localHeaderOffset);
   const out = new Map<ZipEntry, EntrySpec>();
-  for (let i = 0; i < byOffset.length; i++) {
+  // Single pass from the end: the "next" boundary for entry i is the nearest
+  // offset strictly greater than its own, or the central directory. O(n) even
+  // when a hostile archive gives every entry the same offset.
+  let nextGreater = index.centralDirectoryOffset;
+  for (let i = byOffset.length - 1; i >= 0; i--) {
     const e = byOffset[i]!;
-    let next = index.centralDirectoryOffset;
-    for (let j = i + 1; j < byOffset.length; j++) {
-      if (byOffset[j]!.localHeaderOffset > e.localHeaderOffset) {
-        next = byOffset[j]!.localHeaderOffset;
-        break;
-      }
-    }
+    // The compressed data we actually need is at most compressedSize; clamp the
+    // range so a lying header can't make us pull gigabytes over the network.
+    const dataCap = Math.min(e.compressedSize, MAX_ENTRY_BYTES);
+    // Local header (30) + max filename (65535) + max extra field (65535) + data.
+    const end = Math.max(nextGreater - 1, e.localHeaderOffset + 30 + 2 * 0xffff + dataCap);
     out.set(e, {
       start: e.localHeaderOffset,
-      // Never ask for less than a bare header + the compressed data.
-      end: Math.max(next - 1, e.localHeaderOffset + 29 + e.compressedSize),
+      end,
       method: e.method,
       compressedSize: e.compressedSize,
       uncompressedSize: e.uncompressedSize,
     });
+    if (e.localHeaderOffset < nextGreater) nextGreater = e.localHeaderOffset;
   }
   return out;
 }
@@ -210,9 +231,23 @@ export function entrySpecs(index: ZipIndex): Map<ZipEntry, EntrySpec> {
  * server ignored the Range header), return the decompressed entry.
  */
 export function extractEntry(data: Uint8Array, spec: EntrySpec): Uint8Array {
-  // More bytes than we asked for means the server ignored Range and sent the whole file.
-  const requested = spec.end - spec.start + 1;
-  const base = data.length > requested && data.length >= spec.start + 30 ? spec.start : 0;
+  if (
+    !Number.isSafeInteger(spec.compressedSize) ||
+    !Number.isSafeInteger(spec.uncompressedSize) ||
+    spec.compressedSize < 0 ||
+    spec.uncompressedSize < 0 ||
+    spec.compressedSize > MAX_ENTRY_BYTES ||
+    spec.uncompressedSize > MAX_ENTRY_BYTES
+  ) {
+    throw new Error("ZIP entry is implausibly large; refusing to read it");
+  }
+
+  // The response is either exactly the entry's byte range (data starts at its local
+  // header) or, if the server ignored Range, the whole file (the header sits at the
+  // entry's absolute offset). Detect the whole-file case by a valid signature at the
+  // absolute offset; otherwise treat the data as starting at the entry.
+  const base =
+    spec.start > 0 && data.length >= spec.start + 30 && u32(data, spec.start) === SIG_LOCAL ? spec.start : 0;
   if (data.length < base + 30 || u32(data, base) !== SIG_LOCAL) {
     throw new Error("Response does not contain the expected ZIP entry");
   }
@@ -227,10 +262,13 @@ export function extractEntry(data: Uint8Array, spec: EntrySpec): Uint8Array {
   switch (spec.method) {
     case 0:
       return compressed;
-    case 8:
-      return spec.uncompressedSize > 0
-        ? inflateSync(compressed, { out: new Uint8Array(spec.uncompressedSize) })
-        : inflateSync(compressed);
+    case 8: {
+      // A fixed output buffer caps decompression: fflate writes at most this many
+      // bytes, so even a deflate bomb can't expand past the declared (capped) size.
+      const out = spec.uncompressedSize > 0 ? inflateSync(compressed, { out: new Uint8Array(spec.uncompressedSize) }) : inflateSync(compressed);
+      if (out.length > MAX_ENTRY_BYTES) throw new Error("ZIP entry expanded beyond the allowed size");
+      return out;
+    }
     default:
       throw new Error(`Unsupported ZIP compression method ${spec.method}`);
   }
@@ -254,7 +292,11 @@ export function encodeSpec(spec: EntrySpec): string {
 export function decodeSpec(fragment: string | undefined): EntrySpec | undefined {
   if (!fragment || !fragment.startsWith(SPEC_PREFIX)) return undefined;
   const parts = fragment.slice(SPEC_PREFIX.length).split("-").map(Number);
-  if (parts.length !== 5 || parts.some((n) => !Number.isFinite(n) || n < 0)) return undefined;
+  if (parts.length !== 5 || parts.some((n) => !Number.isSafeInteger(n) || n < 0)) return undefined;
   const [start, end, method, compressedSize, uncompressedSize] = parts as [number, number, number, number, number];
+  // Reject a fragment that tries to smuggle an oversized entry past the parser.
+  if (compressedSize > MAX_ENTRY_BYTES || uncompressedSize > MAX_ENTRY_BYTES || end - start > MAX_ENTRY_BYTES + 2 * 0xffff + 30) {
+    return undefined;
+  }
   return { start, end, method, compressedSize, uncompressedSize };
 }
